@@ -1,0 +1,145 @@
+{
+  "workspaces": [
+    {
+      "id": "7d6b58eb-9d4b-4f30-b925-c876d15d4e0e",
+      "name": "General Workspace",
+      "channels": [
+        {
+          "id": "250a7692-f04c-438c-a231-13c42a028ceb",
+          "name": "general",
+          "messages": [
+            {
+              "id": "df5f7401-730c-4ebe-ba40-728c2eed6ec8",
+              "text": "Thank you! My good sir!",
+              "sender": "joesefmayson",
+              "time": "8:00:35 PM",
+              "avatarColor": "#7461",
+              "senderId": "3d83bb2f-30dd-434b-849e-f96589bfce11",
+              "replies": [],
+              "reactions": []
+            },
+            {
+              "id": "514894a7-ae45-49be-98c9-de0c0cfab591",
+              "text": "No, thank you!",
+              "sender": "New Test Subject",
+              "time": "6:03:02 PM",
+              "avatarColor": "#ea1b5",
+              "senderId": "df1a147d-6da1-4a79-b466-340e5ade7cd2",
+              "replies": [],
+              "reactions": [
+                {
+                  "emoji": "🥰",
+                  "users": [
+                    "dc6cee8c-05b6-4dbc-8ecc-29693f0c7e14"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "9c6aaa05-c15f-4228-994e-616917686534",
+              "text": "😇",
+              "sender": "joesefmayson",
+              "time": "8:14:10 PM",
+              "avatarColor": "#7ba523",
+              "senderId": "3d83bb2f-30dd-434b-849e-f96589bfce11",
+              "replies": [],
+              "reactions": [
+                {
+                  "emoji": "😃",
+                  "users": [
+                    "user_1753369908138"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "8ce377fe-a70d-4095-884f-71b033ee5d8d",
+              "text": "😃😐️🤨",
+              "sender": "joesefmayson",
+              "time": "03:58 PM",
+              "avatarColor": "#d93f29",
+              "senderId": "3d83bb2f-30dd-434b-849e-f96589bfce11",
+              "fileUrl": "/uploads/1753240564551-Funny.txt",
+              "fileName": "Funny.txt",
+              "replies": [],
+              "reactions": [
+                {
+                  "emoji": "🤪",
+                  "users": [
+                    "user_1753369908138"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "0af1f1da-53da-4152-9ca4-1ce2b447bb5a",
+          "name": "project-alpha",
+          "messages": [
+            {
+              "id": "ab9250dd-e70c-4cfd-a8de-bd913cbcb028",
+              "text": "yoyo",
+              "sender": "joesefmayson",
+              "time": "10:17:23 PM",
+              "avatarColor": "#d93f29",
+              "senderId": "3d83bb2f-30dd-434b-849e-f96589bfce11",
+              "replies": [],
+              "reactions": []
+            },
+            {
+              "id": "d32cd9c8-5c0a-4120-91d1-5f33d8848230",
+              "text": "whats up bro",
+              "sender": "newbie",
+              "time": "10:17:38 PM",
+              "avatarColor": "#672f8c",
+              "senderId": "46b88f9a-1de9-4249-9d5a-0e9c6bafa4aa",
+              "replies": [],
+              "reactions": []
+            }
+          ]
+        },
+        {
+          "id": "81d33f2a-c825-4e21-9fe1-266c885b6975",
+          "name": "Test Channel Renamed",
+          "createdBy": "joesefmayson",
+          "createdAt": "2025-07-25T21:37:38.647Z",
+          "messages": []
+        }
+      ]
+    },
+    {
+      "id": "dabad78b-0511-43b7-b046-e04e06c7a938",
+      "name": "New Workspace Renamed",
+      "createdBy": "joesefmayson",
+      "createdAt": "2025-07-25T21:51:35.004Z",
+      "channels": [
+        {
+          "id": "dea36277-6a53-4a04-b732-23b63c194620",
+          "name": "Okay",
+          "createdBy": "joesefmayson",
+          "createdAt": "2025-07-25T21:51:43.307Z",
+          "messages": [
+            {
+              "id": "8dfa1e93-a6c8-40b9-90d3-db0c437d45a2",
+              "text": "💯",
+              "sender": "joesefmayson",
+              "time": "04:58 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [],
+              "reactions": [
+                {
+                  "emoji": "🥇",
+                  "users": [
+                    "user_1753369908138"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

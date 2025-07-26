@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack Clone</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .message-thread { border-left: 2px solid #374151; }
+        .emoji-picker {
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .emoji-picker-reaction {
+            z-index: 1100;
+        }
+        .emoji-picker-input {
+            z-index: 1050;
+        }
+        .file-attachment {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin: 4px 0;
+            border: 1px solid rgba(79, 70, 229, 0.3);
+        }
+        .enhanced-input:hover .input-actions {
+            opacity: 1;
+        }
+        .input-actions {
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+        }
+        .create-buttons {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+        }
+        .workspace-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .context-menu-item:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .workspace-item:hover .workspace-actions {
+            opacity: 1;
+        }
+        .workspace-actions {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // Utility Functions
+        const addMessageToWorkspaces = (workspaces, workspaceId, channelId, msg) => 
+            workspaces.map(ws => 
+                ws.id !== workspaceId ? ws : 
+                { ...ws, channels: ws.channels.map(ch => 
+                    ch.id !== channelId ? ch : 
+                    { ...ch, messages: [...(ch.messages || []), msg] }
+                )}
+            );
+
+        const updateMessageInWorkspaces = (workspaces, workspaceId, channelId, messageId, updater) => {
+            const updateRecursively = messages => 
+                messages.map(msg => {
+                    if (msg.id === messageId) return updater(msg);
+                    if (msg.replies?.length) return { ...msg, replies: updateRecursively(msg.replies) };
+                    return msg;
+                });
+            return workspaces.map(ws => 
+                ws.id !== workspaceId ? ws : 
+                { ...ws, channels: ws.channels.map(ch => 
+                    ch.id !== channelId ? ch : 
+                    { ...ch, messages: updateRecursively(ch.messages) }
+                )}
+            );
+        };
+
+        const addReplyToWorkspaces = (workspaces, workspaceId, channelId, parentId, reply) => {
+            const updateRecursively = messages => 
+                messages.map(msg => {
+                    if (msg.id === parentId) return { ...msg, replies: [...(msg.replies || []), reply] };
+                    if (msg.replies?.length) return { ...msg, replies: updateRecursively(msg.replies) };
+                    return msg;
+                });
+            return workspaces.map(ws => 
+                ws.id !== workspaceId ? ws : 
+                { ...ws, channels: ws.channels.map(ch => 
+                    ch.id !== channelId ? ch : 
+                    { ...ch, messages: updateRecursively(ch.messages) }
+                )}
+            );
+        };
+
+        const removeMessageRecursively = (messages, messageId) => {
+            return messages.filter(msg => {
+                if (msg.id === messageId) return false;
+                if (msg.replies?.length) {
+                    msg.replies = removeMessageRecursively(msg.replies, messageId);
+                }
+                return true;
+            });
+        };
+
+        // Emoji picker data
+        const emojiCategories = {
+            'Smileys': ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓'],
+            'Gestures': ['👍', '👎', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋', '🩸'],
+            'Hearts': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'],
+            'Objects': ['🎉', '🎊', '🎁', '🎈', '🎂', '🍰', '🎵', '🎶', '⭐', '🌟', '💫', '✨', '🔥', '💯', '💢', '💥', '💦', '💨', '🎯', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🏵️', '🎗️', '🎫', '🎟️', '🎪', '🤹', '🎭', '🩰', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🪘', '🎷', '🎺', '🪗', '🎸', '🪕', '🎻'],
+            'Nature': ['🌱', '🌿', '🍀', '🎋', '🍃', '🌾', '🌵', '🌲', '🌳', '🌴', '🪵', '🌸', '🌺', '🌻', '🌷', '🌹', '🥀', '🏵️', '🌼', '🌟', '⭐', '🌙', '☀️', '⛅', '🌤️', '⛈️', '🌧️', '❄️', '☃️', '⛄', '🌊', '💧', '🔥', '💥', '⚡', '🌈', '☔', '💨', '❄️', '⭐', '🌟', '💫', '✨'],
+            'Food': ['🍎', '🍌', '🍊', '🍋', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🧄', '🧅', '🍄', '🥔', '🍠', '🥐', '🥖', '🍞', '🥨', '🥯', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴'],
+            'Activities': ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '⛹️', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽']
+        };
+
+        // Custom Emoji Picker Component
+        const EmojiPicker = ({ onEmojiSelect, onClose }) => {
+            const [selectedCategory, setSelectedCategory] = useState('Smileys');
+
+            // Category icons for better navigation
+            const categoryIcons = {
+                'Smileys': '😀',
+                'Gestures': '👍', 
+                'Hearts': '❤️',
+                'Objects': '🎉',
+                'Nature': '🌿',
+                'Food': '🍎',
+                'Activities': '⚽'
+            };
+
+            return (
+                <div className="emoji-picker emoji-picker-reaction bg-gray-800 text-white border-gray-600 w-80 h-72">
+                    <div className="flex border-b border-gray-600 overflow-x-auto">
+                        {Object.keys(emojiCategories).map(category => (
+                            <button
+                                key={category}
+                                className={`px-2 py-2 text-xs flex-shrink-0 flex flex-col items-center gap-1 ${selectedCategory === category ? 'bg-blue-600' : 'hover:bg-gray-700'}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCategory(category);
+                                }}
+                                title={category}
+                            >
+                                <span className="text-base">{categoryIcons[category]}</span>
+                                <span className="text-xs">{category}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="p-2 h-56 overflow-y-auto">
+                        <div className="grid grid-cols-8 gap-1">
+                            {emojiCategories[selectedCategory].map(emoji => (
+                                <button
+                                    key={emoji}
+                                    className="text-xl hover:bg-gray-700 rounded p-1 transition-colors"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onEmojiSelect(emoji);
+                                        onClose();
+                                    }}
+                                >
+                                    {emoji}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // File Preview Component
+        const FilePreview = ({ fileUrl, fileName, onClose }) => {
+            const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName);
+            const isPDF = /\.pdf$/i.test(fileName);
+            const isText = /\.(txt|md|json|xml|csv)$/i.test(fileName);
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999]" onClick={onClose}>
+                    <div className="bg-gray-800 rounded-lg max-w-4xl max-h-full overflow-auto m-4" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center p-4 border-b border-gray-600">
+                            <h3 className="text-lg font-semibold text-white">{fileName}</h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+                        </div>
+                        <div className="p-4">
+                            {isImage && (
+                                <img src={fileUrl} alt={fileName} className="max-w-full max-h-96 object-contain mx-auto" />
+                            )}
+                            {isPDF && (
+                                <iframe src={fileUrl} className="w-full h-96" title={fileName}></iframe>
+                            )}
+                            {isText && (
+                                <div className="bg-gray-900 p-4 rounded text-white font-mono text-sm max-h-96 overflow-auto">
+                                    <p>Text file preview not available. <a href={fileUrl} download={fileName} className="text-blue-400 underline">Download to view</a></p>
+                                </div>
+                            )}
+                            {!isImage && !isPDF && !isText && (
+                                <div className="text-center text-gray-400 py-8">
+                                    <p>Preview not available for this file type.</p>
+                                    <a href={fileUrl} download={fileName} className="text-blue-400 underline">Download file</a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Enhanced Input Component with emoji and file upload
+        const EnhancedInput = ({ 
+            value, 
+            onChange, 
+            onSubmit, 
+            placeholder, 
+            onFileUpload, 
+            className = "", 
+            buttonText = "Send",
+            inputRef
+        }) => {
+            const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+            const [isUploading, setIsUploading] = useState(false);
+            const [emojiPickerPosition, setEmojiPickerPosition] = useState('bottom');
+            const fileInputRef = useRef(null);
+            const containerRef = useRef(null);
+
+            const handleEmojiInsert = (emoji) => {
+                const newValue = value + emoji;
+                onChange({ target: { value: newValue } });
+                setShowEmojiPicker(false);
+            };
+
+            const toggleEmojiPicker = () => {
+                if (!showEmojiPicker && containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const emojiPickerHeight = 290; // Approximate height of emoji picker
+                    
+                    // If not enough space below, show above
+                    if (spaceBelow < emojiPickerHeight) {
+                        setEmojiPickerPosition('top');
+                    } else {
+                        setEmojiPickerPosition('bottom');
+                    }
+                }
+                setShowEmojiPicker(!showEmojiPicker);
+            };
+
+            const handleFileSelect = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setIsUploading(true);
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    onFileUpload(result.fileUrl, result.originalName);
+                } catch (error) {
+                    console.error('File upload failed:', error);
+                    alert('File upload failed. Please try again.');
+                } finally {
+                    setIsUploading(false);
+                    e.target.value = '';
+                }
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit(e);
+            };
+
+            return (
+                <div ref={containerRef} className="relative enhanced-input">
+                    <form onSubmit={handleSubmit} className={`flex items-center gap-2 ${className}`}>
+                        <div className="flex-1 relative">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={value}
+                                onChange={onChange}
+                                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white pr-20"
+                                placeholder={placeholder}
+                                autoComplete="off"
+                            />
+                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1 input-actions">
+                                <button
+                                    type="button"
+                                    onClick={toggleEmojiPicker}
+                                    className="text-gray-400 hover:text-white text-sm px-1 py-1 rounded hover:bg-gray-700"
+                                    title="Insert emoji"
+                                >
+                                    😀
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="text-gray-400 hover:text-white text-sm px-1 py-1 rounded hover:bg-gray-700"
+                                    title="Upload file"
+                                    disabled={isUploading}
+                                >
+                                    {isUploading ? '⏳' : '📎'}
+                                </button>
+                            </div>
+                        </div>
+                        <button 
+                            type="submit" 
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm disabled:opacity-50"
+                            disabled={isUploading}
+                        >
+                            {isUploading ? 'Uploading...' : buttonText}
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            accept="*/*"
+                        />
+                    </form>
+                    {showEmojiPicker && (
+                        <div className={`absolute left-0 emoji-picker-input ${
+                            emojiPickerPosition === 'top' 
+                                ? 'bottom-full mb-2' 
+                                : 'top-full mt-2'
+                        }`}>
+                            <EmojiPicker
+                                onEmojiSelect={handleEmojiInsert}
+                                onClose={() => setShowEmojiPicker(false)}
+                            />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Message Component with inline replies
+        const Message = ({ 
+            message, 
+            level = 0, 
+            onReply, 
+            onReaction, 
+            onEdit,
+            onDelete,
+            userId,
+            username,
+            onShowEmojiPicker,
+            pickerMessageId,
+            onEmojiSelect 
+        }) => {
+            const [showReplyInput, setShowReplyInput] = useState(false);
+            const [replyText, setReplyText] = useState('');
+            const [replyFileUrl, setReplyFileUrl] = useState('');
+            const [replyFileName, setReplyFileName] = useState('');
+            const [isEditing, setIsEditing] = useState(false);
+            const [editText, setEditText] = useState(message.text);
+            const [showFilePreview, setShowFilePreview] = useState(false);
+
+            // Update edit text when message text changes (for live updates)
+            useEffect(() => {
+                setEditText(message.text);
+            }, [message.text]);
+            const replyInputRef = useRef(null);
+            const editInputRef = useRef(null);
+
+            const handleReplySubmit = (e) => {
+                e.preventDefault();
+                if (replyText.trim() || replyFileUrl) {
+                    onReply(message.id, replyText, replyFileUrl, replyFileName);
+                    setReplyText('');
+                    setReplyFileUrl('');
+                    setReplyFileName('');
+                    setShowReplyInput(false);
+                }
+            };
+
+            const handleReplyClick = () => {
+                setShowReplyInput(true);
+                setTimeout(() => replyInputRef.current?.focus(), 100);
+            };
+
+            const handleReplyFileUpload = (fileUrl, fileName) => {
+                setReplyFileUrl(fileUrl);
+                setReplyFileName(fileName);
+                if (!replyText.trim()) {
+                    setReplyText(`(Uploaded file: ${fileName})`);
+                }
+            };
+
+            const handleEditSubmit = (e) => {
+                e.preventDefault();
+                if (editText.trim() && editText.trim() !== message.text) {
+                    onEdit(message.id, editText.trim());
+                }
+                setIsEditing(false);
+            };
+
+            const handleEditClick = () => {
+                setIsEditing(true);
+                setEditText(message.text);
+                setTimeout(() => editInputRef.current?.focus(), 100);
+            };
+
+            const handleDeleteClick = () => {
+                if (confirm('Are you sure you want to delete this message?')) {
+                    onDelete(message.id);
+                }
+            };
+
+            const canModify = message.sender === username;
+
+            return (
+                <div className={`mb-2 ${level > 0 ? 'ml-6 pl-4 message-thread' : ''}`}>
+                    <div className="flex items-start">
+                        <div 
+                            className="w-8 h-8 rounded-full mr-3 flex-shrink-0" 
+                            style={{ backgroundColor: message.avatarColor || '#9CA3AF' }}
+                        ></div>
+                        <div className="flex-grow">
+                            <div className="flex items-baseline">
+                                <span className="font-semibold mr-2">{message.sender}</span>
+                                <span className="text-gray-500 text-xs mr-2">{message.time}</span>
+                                {canModify && (
+                                    <div className="flex items-center gap-1">
+                                        <button 
+                                            className="text-gray-400 hover:text-white text-xs px-1 py-0.5 rounded hover:bg-gray-700"
+                                            onClick={handleEditClick}
+                                            title="Edit message"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button 
+                                            className="text-gray-400 hover:text-red-400 text-xs px-1 py-0.5 rounded hover:bg-gray-700"
+                                            onClick={handleDeleteClick}
+                                            title="Delete message"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                            {isEditing ? (
+                                <form onSubmit={handleEditSubmit} className="mt-1 mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            ref={editInputRef}
+                                            type="text"
+                                            value={editText}
+                                            onChange={(e) => setEditText(e.target.value)}
+                                            className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white"
+                                            autoComplete="off"
+                                        />
+                                        <button 
+                                            type="submit" 
+                                            className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
+                                        >
+                                            Save
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={() => setIsEditing(false)}
+                                            className="text-gray-400 hover:text-white px-2 text-xs"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <p className="text-white mb-1">{message.text}</p>
+                            )}
+                            {message.fileUrl && (
+                                <div className="mb-1">
+                                    <div className="file-attachment flex items-center gap-2">
+                                        <span className="text-white font-medium">📎 {message.fileName}</span>
+                                        <div className="flex gap-1 ml-auto">
+                                            <button
+                                                onClick={() => setShowFilePreview(true)}
+                                                className="text-gray-200 hover:text-white text-xs px-2 py-1 rounded hover:bg-black hover:bg-opacity-30"
+                                            >
+                                                Preview
+                                            </button>
+                                            <a 
+                                                href={message.fileUrl} 
+                                                download={message.fileName}
+                                                className="text-gray-200 hover:text-white text-xs px-2 py-1 rounded hover:bg-black hover:bg-opacity-30"
+                                            >
+                                                Download
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2 mt-1 mb-2">
+                                <button 
+                                    className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-700"
+                                    onClick={handleReplyClick}
+                                >
+                                    Reply
+                                </button>
+                                <button 
+                                    className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-gray-700" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onShowEmojiPicker(message.id, e);
+                                    }}
+                                >
+                                    😀
+                                </button>
+                            </div>
+
+                            {/* Reactions */}
+                            {(message.reactions || []).length > 0 && (
+                                <div className="flex items-center gap-1 flex-wrap mb-2">
+                                    {message.reactions.map(({ emoji, users }, index) => (
+                                        <button 
+                                            key={index} 
+                                            className={`bg-gray-700 rounded-full px-2 py-1 text-sm cursor-pointer flex items-center gap-1 hover:bg-gray-600 ${users.includes(userId) ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                                            onClick={() => onReaction(message.id, emoji)}
+                                        >
+                                            <span>{emoji}</span>
+                                            <span className="text-xs text-gray-300">{users.length}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Reply input */}
+                            {showReplyInput && (
+                                <div className="mt-2 mb-3">
+                                    <EnhancedInput
+                                        value={replyText}
+                                        onChange={(e) => setReplyText(e.target.value)}
+                                        onSubmit={handleReplySubmit}
+                                        placeholder={`Reply to ${message.sender}...`}
+                                        onFileUpload={handleReplyFileUpload}
+                                        inputRef={replyInputRef}
+                                        buttonText="Send"
+                                    />
+                                    {replyFileUrl && (
+                                        <div className="mt-2 text-sm text-gray-400">
+                                            📎 {replyFileName} attached
+                                        </div>
+                                    )}
+                                    <button 
+                                        type="button"
+                                        onClick={() => {
+                                            setShowReplyInput(false);
+                                            setReplyText('');
+                                            setReplyFileUrl('');
+                                            setReplyFileName('');
+                                        }}
+                                        className="text-gray-400 hover:text-white px-2 py-1 text-sm mt-1"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Emoji Picker for this message */}
+                            {pickerMessageId === message.id && (
+                                <div className="relative mb-2">
+                                    <EmojiPicker
+                                        onEmojiSelect={(emoji) => onEmojiSelect(message.id, emoji)}
+                                        onClose={() => onShowEmojiPicker(null)}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Recursive replies */}
+                            {(message.replies || []).map(reply => (
+                                <Message
+                                    key={reply.id}
+                                    message={reply}
+                                    level={level + 1}
+                                    onReply={onReply}
+                                    onReaction={onReaction}
+                                    onEdit={onEdit}
+                                    onDelete={onDelete}
+                                    userId={userId}
+                                    username={username}
+                                    onShowEmojiPicker={onShowEmojiPicker}
+                                    pickerMessageId={pickerMessageId}
+                                    onEmojiSelect={onEmojiSelect}
+                                />
+                            ))}
+
+                            {/* File Preview Modal */}
+                            {showFilePreview && message.fileUrl && (
+                                <FilePreview
+                                    fileUrl={message.fileUrl}
+                                    fileName={message.fileName}
+                                    onClose={() => setShowFilePreview(false)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Workspace/Channel Creation Modal Component
+        const CreateModal = ({ isOpen, onClose, title, placeholder, onSubmit, submitText = "Create", initialValue = "" }) => {
+            const [inputValue, setInputValue] = useState('');
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                if (isOpen) {
+                    setInputValue(initialValue);
+                    setTimeout(() => inputRef.current?.focus(), 100);
+                }
+            }, [isOpen, initialValue]);
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (inputValue.trim()) {
+                    onSubmit(inputValue.trim());
+                    setInputValue('');
+                    onClose();
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[9999]" onClick={onClose}>
+                    <div className="bg-gray-900 text-white rounded-lg shadow-xl p-6 relative max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+                        <button 
+                            className="absolute top-3 right-3 text-gray-400 hover:text-white text-2xl" 
+                            onClick={onClose}
+                        >
+                            &times;
+                        </button>
+                        <h3 className="text-lg font-bold mb-4">{title}</h3>
+                        <form onSubmit={handleSubmit}>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white mb-4"
+                                placeholder={placeholder}
+                                autoComplete="off"
+                            />
+                            <div className="flex gap-2 justify-end">
+                                <button 
+                                    type="button"
+                                    onClick={onClose}
+                                    className="px-4 py-2 text-gray-400 hover:text-white rounded"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+                                    disabled={!inputValue.trim()}
+                                >
+                                    {submitText}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // Context Menu Component
+        const ContextMenu = ({ isOpen, onClose, x, y, items }) => {
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-[9998]" onClick={onClose}>
+                    <div 
+                        className="absolute bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-2 min-w-48"
+                        style={{ left: x, top: y }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {items.map((item, index) => (
+                            <button
+                                key={index}
+                                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                                    item.danger ? 'text-red-400 hover:text-red-300' : 'text-white'
+                                }`}
+                                onClick={() => {
+                                    item.onClick();
+                                    onClose();
+                                }}
+                                disabled={item.disabled}
+                            >
+                                <span>{item.icon}</span>
+                                {item.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Main Application
+        const App = () => {
+            const [workspaces, setWorkspaces] = useState([]);
+            const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(null);
+            const [selectedChannelId, setSelectedChannelId] = useState(null);
+            const [username, setUsername] = useState('');
+            const [userId, setUserId] = useState('');
+            const [avatarColor, setAvatarColor] = useState('#9CA3AF');
+            const [pickerMessageId, setPickerMessageId] = useState(null);
+            const [messageText, setMessageText] = useState('');
+            const [messageFileUrl, setMessageFileUrl] = useState('');
+            const [messageFileName, setMessageFileName] = useState('');
+            const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+            const [showCreateChannel, setShowCreateChannel] = useState(false);
+            const [showRenameWorkspace, setShowRenameWorkspace] = useState(false);
+            const [showRenameChannel, setShowRenameChannel] = useState(false);
+            const [renameTargetId, setRenameTargetId] = useState(null);
+            const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, type: null, targetId: null });
+            const socket = useMemo(() => io(), []);
+
+            useEffect(() => {
+                let storedUser = localStorage.getItem('slack_user');
+                if (storedUser) {
+                    const user = JSON.parse(storedUser);
+                    setUsername(user.username);
+                    setUserId(user.userId);
+                    setAvatarColor(user.avatarColor);
+                } else {
+                    const newUsername = prompt('Please enter your username:');
+                    if (newUsername) {
+                        const newUser = {
+                            username: newUsername,
+                            userId: `user_${Date.now()}`,
+                            avatarColor: `hsl(${Math.random() * 360}, 70%, 50%)`
+                        };
+                        localStorage.setItem('slack_user', JSON.stringify(newUser));
+                        setUsername(newUser.username);
+                        setUserId(newUser.userId);
+                        setAvatarColor(newUser.avatarColor);
+                    }
+                }
+
+                // Socket event listeners
+                socket.on('connect', () => console.log('Connected to server'));
+                
+                socket.on('init', (data) => {
+                    setWorkspaces(data.workspaces || []);
+                    if (data.workspaces?.length > 0) {
+                        const targetWorkspace = selectedWorkspaceId 
+                            ? data.workspaces.find(ws => ws.id === selectedWorkspaceId) || data.workspaces[0]
+                            : data.workspaces[0];
+                        
+                        const wsId = targetWorkspace.id;
+                        const chId = selectedChannelId && targetWorkspace.channels.find(ch => ch.id === selectedChannelId)
+                            ? selectedChannelId
+                            : targetWorkspace.channels[0]?.id;
+                        
+                        setSelectedWorkspaceId(wsId);
+                        setSelectedChannelId(chId);
+                        if (chId) socket.emit('join channel', { workspaceId: wsId, channelId: chId });
+                    }
+                });
+
+                socket.on('chat message', ({ workspaceId, channelId, msg }) => 
+                    setWorkspaces(ws => addMessageToWorkspaces(ws, workspaceId, channelId, msg)));
+                
+                socket.on('reply added', ({ workspaceId, channelId, parentId, reply }) => 
+                    setWorkspaces(ws => addReplyToWorkspaces(ws, workspaceId, channelId, parentId, reply)));
+
+                socket.on('reaction updated', ({ workspaceId, channelId, messageId, reactions }) => 
+                    setWorkspaces(ws => updateMessageInWorkspaces(ws, workspaceId, channelId, messageId, msg => ({ ...msg, reactions }))));
+
+                socket.on('message updated', ({ workspaceId, channelId, messageId, newText, newTime }) => 
+                    setWorkspaces(ws => updateMessageInWorkspaces(ws, workspaceId, channelId, messageId, msg => ({ ...msg, text: newText, time: newTime }))));
+
+                socket.on('message deleted', ({ workspaceId, channelId, messageId }) => 
+                    setWorkspaces(ws => ws.map(workspace => 
+                        workspace.id !== workspaceId ? workspace : 
+                        { ...workspace, channels: workspace.channels.map(channel => 
+                            channel.id !== channelId ? channel : 
+                            { ...channel, messages: removeMessageRecursively(channel.messages, messageId) }
+                        )}
+                    )));
+
+                socket.on('reply updated', ({ workspaceId, channelId, replyId, newText, time }) => 
+                    setWorkspaces(ws => updateMessageInWorkspaces(ws, workspaceId, channelId, replyId, msg => ({ ...msg, text: newText, time }))));
+
+                socket.on('reply deleted', ({ workspaceId, channelId, parentId, replyId }) => 
+                    setWorkspaces(ws => updateMessageInWorkspaces(ws, workspaceId, channelId, parentId, msg => ({ 
+                        ...msg, 
+                        replies: msg.replies ? msg.replies.filter(reply => reply.id !== replyId) : []
+                    }))));
+
+                socket.on('workspace created', ({ workspace }) => {
+                    setWorkspaces(ws => [...ws, workspace]);
+                    // Auto-select the new workspace and its first channel
+                    setSelectedWorkspaceId(workspace.id);
+                    setSelectedChannelId(workspace.channels[0]?.id);
+                    if (workspace.channels[0]?.id) {
+                        socket.emit('join channel', { workspaceId: workspace.id, channelId: workspace.channels[0].id });
+                    }
+                });
+
+                socket.on('channel created', ({ workspaceId, channel }) => {
+                    setWorkspaces(ws => ws.map(workspace => 
+                        workspace.id !== workspaceId ? workspace : 
+                        { ...workspace, channels: [...workspace.channels, channel] }
+                    ));
+                    // Auto-select the new channel if we're in the same workspace
+                    if (workspaceId === selectedWorkspaceId) {
+                        setSelectedChannelId(channel.id);
+                        socket.emit('join channel', { workspaceId, channelId: channel.id });
+                    }
+                });
+
+                socket.on('workspace deleted', ({ workspaceId }) => {
+                    setWorkspaces(ws => {
+                        const newWorkspaces = ws.filter(workspace => workspace.id !== workspaceId);
+                        // If deleted workspace was selected, select the first available one
+                        if (workspaceId === selectedWorkspaceId && newWorkspaces.length > 0) {
+                            const firstWorkspace = newWorkspaces[0];
+                            setSelectedWorkspaceId(firstWorkspace.id);
+                            setSelectedChannelId(firstWorkspace.channels[0]?.id);
+                            if (firstWorkspace.channels[0]?.id) {
+                                socket.emit('join channel', { workspaceId: firstWorkspace.id, channelId: firstWorkspace.channels[0].id });
+                            }
+                        } else if (newWorkspaces.length === 0) {
+                            setSelectedWorkspaceId(null);
+                            setSelectedChannelId(null);
+                        }
+                        return newWorkspaces;
+                    });
+                });
+
+                socket.on('channel deleted', ({ workspaceId, channelId }) => {
+                    setWorkspaces(ws => {
+                        const newWorkspaces = ws.map(workspace => 
+                            workspace.id !== workspaceId ? workspace : 
+                            { ...workspace, channels: workspace.channels.filter(ch => ch.id !== channelId) }
+                        );
+                        
+                        // If deleted channel was selected, select the first available one in the workspace
+                        if (channelId === selectedChannelId) {
+                            const currentWorkspace = newWorkspaces.find(ws => ws.id === workspaceId);
+                            const remainingChannels = currentWorkspace?.channels;
+                            if (remainingChannels?.length > 0) {
+                                setSelectedChannelId(remainingChannels[0].id);
+                                socket.emit('join channel', { workspaceId, channelId: remainingChannels[0].id });
+                            } else {
+                                setSelectedChannelId(null);
+                            }
+                        }
+                        
+                        return newWorkspaces;
+                    });
+                });
+
+                socket.on('workspace renamed', ({ workspaceId, newName }) => {
+                    setWorkspaces(ws => ws.map(workspace => 
+                        workspace.id !== workspaceId ? workspace : 
+                        { ...workspace, name: newName }
+                    ));
+                });
+
+                socket.on('channel renamed', ({ workspaceId, channelId, newName }) => {
+                    setWorkspaces(ws => ws.map(workspace => 
+                        workspace.id !== workspaceId ? workspace : 
+                        { ...workspace, channels: workspace.channels.map(ch => 
+                            ch.id !== channelId ? ch : { ...ch, name: newName }
+                        )}
+                    ));
+                });
+
+                socket.on('error', ({ message }) => {
+                    alert(message);
+                });
+
+                // Request initial data
+                socket.emit('get workspaces');
+
+                return () => socket.off();
+            }, [selectedWorkspaceId, selectedChannelId]);
+
+            // Handle workspace/channel changes
+            useEffect(() => {
+                if (selectedWorkspaceId && selectedChannelId) {
+                    socket.emit('join channel', { workspaceId: selectedWorkspaceId, channelId: selectedChannelId });
+                }
+            }, [selectedWorkspaceId, selectedChannelId, socket]);
+
+            const currentWorkspace = workspaces.find(ws => ws.id === selectedWorkspaceId);
+            const currentChannel = currentWorkspace?.channels.find(ch => ch.id === selectedChannelId);
+            const currentMessages = currentChannel?.messages || [];
+
+            const handleSendMessage = (text, fileUrl = '', fileName = '') => {
+                if (text.trim() || fileUrl) {
+                    socket.emit('chat message', { 
+                        workspaceId: selectedWorkspaceId, 
+                        channel: selectedChannelId, 
+                        msg: text,
+                        username,
+                        userId,
+                        avatarColor,
+                        fileUrl,
+                        fileName
+                    });
+                    setMessageText('');
+                    setMessageFileUrl('');
+                    setMessageFileName('');
+                }
+            };
+
+            const handleSendReply = (parentId, text, fileUrl = '', fileName = '') => {
+                if (text.trim() || fileUrl) {
+                    socket.emit('add reply', { 
+                        workspaceId: selectedWorkspaceId, 
+                        channelId: selectedChannelId, 
+                        parentId, 
+                        reply: { 
+                            text, 
+                            sender: username, 
+                            userId, 
+                            avatarColor,
+                            fileUrl,
+                            fileName,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            id: `msg_${Date.now()}`
+                        }
+                    });
+                }
+            };
+
+            const handleUpdateReaction = (messageId, emoji) => {
+                socket.emit('update reaction', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channelId: selectedChannelId, 
+                    messageId, 
+                    userId, 
+                    emoji 
+                });
+            };
+
+            const handleShowEmojiPicker = (messageId, event = null) => {
+                setPickerMessageId(messageId);
+            };
+
+            const handleEmojiSelect = (messageId, emoji) => {
+                handleUpdateReaction(messageId, emoji);
+                setPickerMessageId(null);
+            };
+
+            const handleMessageFileUpload = (fileUrl, fileName) => {
+                setMessageFileUrl(fileUrl);
+                setMessageFileName(fileName);
+                if (!messageText.trim()) {
+                    setMessageText(`(Uploaded file: ${fileName})`);
+                }
+            };
+
+            const handleMainMessageSubmit = (e) => {
+                e.preventDefault();
+                handleSendMessage(messageText, messageFileUrl, messageFileName);
+            };
+
+            const handleCreateWorkspace = (workspaceName) => {
+                socket.emit('create workspace', { 
+                    name: workspaceName,
+                    createdBy: username,
+                    userId
+                });
+            };
+
+            const handleCreateChannel = (channelName) => {
+                if (!selectedWorkspaceId) {
+                    alert('Please select a workspace first');
+                    return;
+                }
+                socket.emit('create channel', { 
+                    workspaceId: selectedWorkspaceId,
+                    name: channelName,
+                    createdBy: username,
+                    userId
+                });
+            };
+
+            const handleDeleteWorkspace = (workspaceId) => {
+                const workspace = workspaces.find(ws => ws.id === workspaceId);
+                if (confirm(`Are you sure you want to delete workspace "${workspace?.name}"? This will delete all channels and messages in this workspace.`)) {
+                    socket.emit('delete workspace', { 
+                        workspaceId,
+                        userId,
+                        username
+                    });
+                }
+            };
+
+            const handleDeleteChannel = (workspaceId, channelId) => {
+                const workspace = workspaces.find(ws => ws.id === workspaceId);
+                const channel = workspace?.channels.find(ch => ch.id === channelId);
+                
+                // Prevent deletion of the last channel
+                if (workspace?.channels.length <= 1) {
+                    alert('Cannot delete the last channel in a workspace');
+                    return;
+                }
+                
+                if (confirm(`Are you sure you want to delete channel "#${channel?.name}"? This will delete all messages in this channel.`)) {
+                    socket.emit('delete channel', { 
+                        workspaceId,
+                        channelId,
+                        userId,
+                        username
+                    });
+                }
+            };
+
+            const handleRenameWorkspace = (workspaceId, newName) => {
+                socket.emit('rename workspace', { 
+                    workspaceId,
+                    newName,
+                    userId,
+                    username
+                });
+            };
+
+            const handleRenameChannel = (workspaceId, channelId, newName) => {
+                socket.emit('rename channel', { 
+                    workspaceId,
+                    channelId,
+                    newName,
+                    userId,
+                    username
+                });
+            };
+
+            const handleWorkspaceContextMenu = (e, workspaceId) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({
+                    show: true,
+                    x: e.clientX,
+                    y: e.clientY,
+                    type: 'workspace',
+                    targetId: workspaceId
+                });
+            };
+
+            const handleChannelContextMenu = (e, workspaceId, channelId) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setContextMenu({
+                    show: true,
+                    x: e.clientX,
+                    y: e.clientY,
+                    type: 'channel',
+                    targetId: channelId,
+                    workspaceId: workspaceId
+                });
+            };
+
+            const closeContextMenu = () => {
+                setContextMenu({ show: false, x: 0, y: 0, type: null, targetId: null });
+            };
+
+            const openRenameWorkspace = (workspaceId) => {
+                setRenameTargetId(workspaceId);
+                setShowRenameWorkspace(true);
+            };
+
+            const openRenameChannel = (channelId) => {
+                setRenameTargetId(channelId);
+                setShowRenameChannel(true);
+            };
+
+            const handleEditMessage = (messageId, newText) => {
+                socket.emit('edit message', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channel: selectedChannelId, 
+                    messageId, 
+                    newText, 
+                    userId, 
+                    username 
+                });
+            };
+
+            const handleDeleteMessage = (messageId) => {
+                socket.emit('delete message', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channel: selectedChannelId, 
+                    messageId, 
+                    userId, 
+                    username 
+                });
+            };
+
+            const handleEditReply = (replyId, newText) => {
+                socket.emit('update reply', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channelId: selectedChannelId, 
+                    replyId, 
+                    newText, 
+                    username 
+                });
+            };
+
+            const handleDeleteReply = (replyId) => {
+                socket.emit('delete reply', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channelId: selectedChannelId, 
+                    replyId, 
+                    username 
+                });
+            };
+
+            // Unified edit/delete handler that determines if it's a message or reply
+            const handleEdit = (messageId, newText) => {
+                const findInMessages = (messages, id) => {
+                    for (const msg of messages) {
+                        if (msg.id === id) return { type: 'message', message: msg };
+                        if (msg.replies) {
+                            const found = findInMessages(msg.replies, id);
+                            if (found) return { type: 'reply', message: found.message };
+                        }
+                    }
+                    return null;
+                };
+
+                const result = findInMessages(currentMessages, messageId);
+                if (result) {
+                    if (result.type === 'message') {
+                        handleEditMessage(messageId, newText);
+                    } else {
+                        handleEditReply(messageId, newText);
+                    }
+                }
+            };
+
+            const handleDelete = (messageId) => {
+                const findInMessages = (messages, id) => {
+                    for (const msg of messages) {
+                        if (msg.id === id) return { type: 'message', message: msg };
+                        if (msg.replies) {
+                            const found = findInMessages(msg.replies, id);
+                            if (found) return { type: 'reply', message: found.message };
+                        }
+                    }
+                    return null;
+                };
+
+                const result = findInMessages(currentMessages, messageId);
+                if (result) {
+                    if (result.type === 'message') {
+                        handleDeleteMessage(messageId);
+                    } else {
+                        handleDeleteReply(messageId);
+                    }
+                }
+            };
+
+            // Close emoji picker when clicking outside
+            useEffect(() => {
+                const handleClickOutside = (event) => {
+                    if (pickerMessageId) {
+                        // Check if the click is inside an emoji picker or related button
+                        const emojiPicker = event.target.closest('.emoji-picker');
+                        const emojiButton = event.target.closest('button[title="😀"]') || 
+                                           event.target.closest('button[class*="emoji"]') ||
+                                           event.target.textContent === '😀';
+                        
+                        // Don't close if clicking inside picker or on emoji button
+                        if (!emojiPicker && !emojiButton) {
+                            setPickerMessageId(null);
+                        }
+                    }
+                };
+                document.addEventListener('click', handleClickOutside);
+                return () => document.removeEventListener('click', handleClickOutside);
+            }, [pickerMessageId]);
+
+            return (
+                <div className="flex h-screen bg-gray-900 text-white">
+                    {/* Sidebar */}
+                    <div className="w-64 bg-gray-800 text-white h-screen p-4 flex flex-col">
+                        <div className="font-bold text-xl mb-4">Slack Clone</div>
+                        <div className="flex flex-col gap-2 flex-grow overflow-y-auto">
+                            {workspaces.map(ws => (
+                                <div key={ws.id}>
+                                    <div 
+                                        className={`font-bold text-lg cursor-pointer p-2 rounded ${ws.id === selectedWorkspaceId ? 'bg-gray-700 text-blue-300' : 'hover:bg-gray-700'}`}
+                                        onClick={() => setSelectedWorkspaceId(ws.id)}
+                                        onContextMenu={(e) => handleWorkspaceContextMenu(e, ws.id)}
+                                    >
+                                        {ws.name}
+                                    </div>
+                                    {ws.id === selectedWorkspaceId && (
+                                        <ul className="ml-2 mt-1">
+                                            {ws.channels.map(channel => (
+                                                <li 
+                                                    key={channel.id} 
+                                                    className={`p-2 rounded cursor-pointer text-sm flex items-center ${channel.id === selectedChannelId ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                                    onClick={() => setSelectedChannelId(channel.id)}
+                                                    onContextMenu={(e) => handleChannelContextMenu(e, ws.id, channel.id)}
+                                                >
+                                                    # {channel.name}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-auto border-t border-gray-700 create-buttons">
+                            <div className="flex items-center gap-2 p-2">
+                                                <button 
+                                    onClick={() => setShowCreateWorkspace(true)}
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-2 rounded transition-colors font-medium"
+                                    title="Create New Workspace"
+                                                >
+                                    <span className="text-blue-200">+</span> Workspace
+                                                </button>
+                                                    <button 
+                                    onClick={() => setShowCreateChannel(true)}
+                                    className={`flex-1 text-xs px-2 py-2 rounded transition-colors font-medium workspace-btn ${
+                                        selectedWorkspaceId 
+                                            ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    }`}
+                                    title={selectedWorkspaceId ? "Create New Channel" : "Select a workspace first"}
+                                    disabled={!selectedWorkspaceId}
+                                >
+                                    <span className={selectedWorkspaceId ? "text-green-200" : "text-gray-500"}>+</span> Channel
+                                                    </button>
+                                                </div>
+                            <div className="flex items-center p-2 border-t border-gray-600">
+                                <div className="w-8 h-8 rounded-full mr-2 border-2 border-gray-600" style={{ backgroundColor: avatarColor }}></div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium">{username || 'User Name'}</span>
+                                    <span className="text-xs text-gray-400">Online</span>
+                                        </div>
+                                    </div>
+                                </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex flex-col flex-1">
+                        <div className="flex-1 p-6 overflow-y-auto bg-gray-900 text-white">
+                            <h2 className="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">
+                                #{currentChannel?.name || 'channel'}
+                            </h2>
+                            {currentMessages.map(msg => (
+                                <Message
+                                    key={msg.id}
+                                    message={msg}
+                                    onReply={handleSendReply}
+                                    onReaction={handleUpdateReaction}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                    userId={userId}
+                                    username={username}
+                                    onShowEmojiPicker={handleShowEmojiPicker}
+                                    pickerMessageId={pickerMessageId}
+                                    onEmojiSelect={handleEmojiSelect}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Message Input */}
+                        <div className="p-4 border-t border-gray-700">
+                            <EnhancedInput
+                                value={messageText}
+                                onChange={(e) => setMessageText(e.target.value)}
+                                onSubmit={handleMainMessageSubmit}
+                                    placeholder={`Message #${currentChannel?.name}`} 
+                                onFileUpload={handleMessageFileUpload}
+                                buttonText="Send"
+                                className="flex items-center"
+                            />
+                            {messageFileUrl && (
+                                <div className="mt-2 text-sm text-gray-400">
+                                    📎 {messageFileName} attached
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Create Workspace Modal */}
+                    <CreateModal
+                        isOpen={showCreateWorkspace}
+                        onClose={() => setShowCreateWorkspace(false)}
+                        title="Create New Workspace"
+                        placeholder="Enter workspace name..."
+                        onSubmit={handleCreateWorkspace}
+                        submitText="Create Workspace"
+                    />
+
+                    {/* Create Channel Modal */}
+                    <CreateModal
+                        isOpen={showCreateChannel}
+                        onClose={() => setShowCreateChannel(false)}
+                        title="Create New Channel"
+                        placeholder="Enter channel name..."
+                        onSubmit={handleCreateChannel}
+                        submitText="Create Channel"
+                    />
+
+                    {/* Rename Workspace Modal */}
+                    <CreateModal
+                        isOpen={showRenameWorkspace}
+                        onClose={() => {
+                            setShowRenameWorkspace(false);
+                            setRenameTargetId(null);
+                        }}
+                        title="Rename Workspace"
+                        placeholder="Enter new workspace name..."
+                        initialValue={workspaces.find(ws => ws.id === renameTargetId)?.name || ''}
+                        onSubmit={(newName) => handleRenameWorkspace(renameTargetId, newName)}
+                        submitText="Rename"
+                    />
+
+                    {/* Rename Channel Modal */}
+                    <CreateModal
+                        isOpen={showRenameChannel}
+                        onClose={() => {
+                            setShowRenameChannel(false);
+                            setRenameTargetId(null);
+                        }}
+                        title="Rename Channel"
+                        placeholder="Enter new channel name..."
+                        initialValue={workspaces.find(ws => ws.channels.some(ch => ch.id === renameTargetId))?.channels.find(ch => ch.id === renameTargetId)?.name || ''}
+                        onSubmit={(newName) => handleRenameChannel(selectedWorkspaceId, renameTargetId, newName)}
+                        submitText="Rename"
+                    />
+
+                    {/* Context Menu */}
+                    <ContextMenu
+                        isOpen={contextMenu.show}
+                        onClose={closeContextMenu}
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        items={
+                            contextMenu.type === 'workspace' ? [
+                                {
+                                    icon: '✏️',
+                                    label: 'Rename Workspace',
+                                    onClick: () => openRenameWorkspace(contextMenu.targetId)
+                                },
+                                {
+                                    icon: '🗑️',
+                                    label: 'Delete Workspace',
+                                    danger: true,
+                                    onClick: () => handleDeleteWorkspace(contextMenu.targetId),
+                                    disabled: workspaces.length <= 1
+                                }
+                            ] : contextMenu.type === 'channel' ? [
+                                {
+                                    icon: '✏️',
+                                    label: 'Rename Channel',
+                                    onClick: () => openRenameChannel(contextMenu.targetId)
+                                },
+                                {
+                                    icon: '🗑️',
+                                    label: 'Delete Channel',
+                                    danger: true,
+                                    onClick: () => handleDeleteChannel(contextMenu.workspaceId, contextMenu.targetId),
+                                    disabled: workspaces.find(ws => ws.id === contextMenu.workspaceId)?.channels.length <= 1
+                                }
+                            ] : []
+                        }
+                    />
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
