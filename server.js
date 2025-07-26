@@ -8,7 +8,6 @@ const multer = require('multer');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
-// Test comment for git
 // Serve uploads statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
