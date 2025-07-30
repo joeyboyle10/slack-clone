@@ -1,7 +1,34 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
+
+// Configure CORS for Express routes
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "https://slack-clone-flame-five.vercel.app",
+    "https://*.vercel.app"
+  ],
+  credentials: true
+}));
+
+// Parse JSON bodies
+app.use(express.json());
+
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, {
+  cors: {
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5000", 
+      "https://slack-clone-flame-five.vercel.app",
+      "https://*.vercel.app" // Allow all Vercel preview deployments
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 const crypto = require('crypto');
 const path = require('path');
 const multer = require('multer');
@@ -23,7 +50,9 @@ const upload = multer({ storage });
 // File upload endpoint
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  res.json({ fileUrl: '/uploads/' + req.file.filename, originalName: req.file.originalname });
+  // Return full URL for cross-origin access
+  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ fileUrl, originalName: req.file.originalname });
 });
 
 const onlineUsers = {};
