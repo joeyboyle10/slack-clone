@@ -10,7 +10,7 @@ primary_region = 'dfw'
 
 [env]
   NODE_ENV = 'production'
-  PORT = '8080'
+  PORT = '3000'
 
 [http_service]
   internal_port = 3000
