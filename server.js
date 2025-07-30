@@ -573,6 +573,7 @@ const updateReactionInMessages = (messages, messageId, userId, emoji) => {
   });
 })();
 
-http.listen(4000, () => {
-  console.log('listening on *:4000');
+const PORT = process.env.PORT || 4000;
+http.listen(PORT, () => {
+  console.log(`listening on *:${PORT}`);
 });
