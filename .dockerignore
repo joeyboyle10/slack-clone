@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+.env
+.env.local
+.env.production
+.env.staging
+uploads/*
+!uploads/.gitkeep
+db.json
+*.log
+.DS_Store
+Thumbs.db 
