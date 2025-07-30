@@ -2,14 +2,28 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Configure CORS for Express routes
+// Configure CORS for Express routes  
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:5000",
-    "https://slack-clone-flame-five.vercel.app",
-    "https://*.vercel.app"
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:5000",
+      "https://slack-clone-flame-five.vercel.app"
+    ];
+    
+    // Allow any Vercel deployment for this project
+    const vercelPattern = /^https:\/\/.*\.vercel\.app$/;
+    
+    if (allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
+      return callback(null, true);
+    }
+    
+    console.log('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
@@ -19,12 +33,26 @@ app.use(express.json());
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:5000", 
-      "https://slack-clone-flame-five.vercel.app",
-      "https://*.vercel.app" // Allow all Vercel preview deployments
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "http://localhost:5000", 
+        "https://slack-clone-flame-five.vercel.app"
+      ];
+      
+      // Allow any Vercel deployment
+      const vercelPattern = /^https:\/\/.*\.vercel\.app$/;
+      
+      if (allowedOrigins.includes(origin) || vercelPattern.test(origin)) {
+        return callback(null, true);
+      }
+      
+      console.log('Socket.IO CORS blocked origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ["GET", "POST"],
     credentials: true
   }
