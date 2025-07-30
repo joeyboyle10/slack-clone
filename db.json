@@ -70,6 +70,65 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "d2622f4d-585c-41ef-a384-383abd78e39d",
+              "text": "Checknice",
+              "sender": "joesefmayson",
+              "time": "08:31 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [
+                {
+                  "id": "msg_1753839086383",
+                  "text": "okay",
+                  "sender": "joesefmayson",
+                  "userId": "user_1753369908138",
+                  "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+                  "fileUrl": "",
+                  "fileName": "",
+                  "time": "08:31 PM",
+                  "replies": [],
+                  "reactions": [
+                    {
+                      "emoji": "😂",
+                      "users": [
+                        "user_1753369908138"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "reactions": []
+            },
+            {
+              "id": "6d48bedf-9793-4c16-8330-eca9a337345e",
+              "text": "this still works?",
+              "sender": "joesefmayson",
+              "time": "08:31 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [],
+              "reactions": [
+                {
+                  "emoji": "💯",
+                  "users": [
+                    "user_1753369908138"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "9b120c6f-f199-437d-b454-9e207720c427",
+              "text": "🤣",
+              "sender": "joesefmayson",
+              "time": "08:31 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [],
+              "reactions": [],
+              "fileUrl": "/uploads/1753839113247-Funny.txt",
+              "fileName": "Funny.txt"
             }
           ]
         },

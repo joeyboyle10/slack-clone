@@ -736,7 +736,7 @@
             // Configure your backend URL here
             const BACKEND_URL = window.location.hostname === 'localhost' 
                 ? 'http://localhost:4000'
-                : 'https://slack-clone-test.fly.dev/'; // Replace with your deployed backend URL
+                : 'https://slack-clone-test.fly.dev'; // Remove trailing slash
             
             const socket = useMemo(() => io(BACKEND_URL), []);
 
@@ -763,7 +763,19 @@
                 }
 
                 // Socket event listeners
-                socket.on('connect', () => console.log('Connected to server'));
+                socket.on('connect', () => {
+                    console.log('✅ Connected to server:', BACKEND_URL);
+                    console.log('Socket ID:', socket.id);
+                });
+                
+                socket.on('connect_error', (error) => {
+                    console.error('❌ Connection error:', error);
+                    console.log('Trying to connect to:', BACKEND_URL);
+                });
+                
+                socket.on('disconnect', (reason) => {
+                    console.log('🔌 Disconnected:', reason);
+                });
                 
                 socket.on('init', (data) => {
                     setWorkspaces(data.workspaces || []);
