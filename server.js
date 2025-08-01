@@ -1,6 +1,22 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
+const OpenAI = require('openai');
 const app = express();
+
+// Initialize OpenAI client
+console.log('🔑 OpenAI API Key:', process.env.OPENAI_API_KEY ? '✅ Loaded' : '❌ Missing');
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+}) : null;
+
+if (openai) {
+  console.log('🤖 OpenAI client initialized successfully');
+} else {
+  console.log('⚠️ OpenAI client not initialized - API key missing');
+}
 
 // Configure CORS for Express routes  
 app.use(cors({
@@ -10,6 +26,7 @@ app.use(cors({
     
     const allowedOrigins = [
       "http://localhost:3000",
+      "http://localhost:4000",
       "http://localhost:5000",
       "https://slack-clone-flame-five.vercel.app"
     ];
@@ -39,6 +56,7 @@ const io = require('socket.io')(http, {
       
       const allowedOrigins = [
         "http://localhost:3000",
+        "http://localhost:4000",
         "http://localhost:5000", 
         "https://slack-clone-flame-five.vercel.app"
       ];
@@ -211,6 +229,232 @@ const updateReactionInMessages = (messages, messageId, userId, emoji) => {
     return null;
 };
 
+// AI Assistant Configuration
+const AI_ASSISTANT = {
+    id: 'ai-assistant-001',
+    username: '🤖 AI Assistant',
+    avatarColor: '#6366f1',
+    userId: 'ai-assistant-001'
+};
+
+// AI Service Functions
+class AIService {
+    static async shouldRespond(message, channel, workspace) {
+        if (!openai) return false;
+        
+        const text = message.text.toLowerCase();
+        
+        // Always respond to direct AI mentions
+        const aiMentioned = text.includes('@ai') || text.includes('ai assistant') || text.includes('🤖');
+        if (aiMentioned) return true;
+        
+        // Always respond to help requests
+        const isHelp = text.includes('help') || text.includes('assist') || text.includes('support');
+        if (isHelp) return true;
+        
+        // Respond to questions with high probability
+        const questionWords = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can you', 'could you', 'would you'];
+        const hasQuestionWord = questionWords.some(word => text.startsWith(word) || text.includes(` ${word} `));
+        const hasQuestionMark = text.includes('?');
+        
+        if (hasQuestionWord || hasQuestionMark) {
+            return Math.random() > 0.2; // 80% chance for questions
+        }
+        
+        // Welcome new users in empty channels
+        const isEmpty = channel.messages.length <= 1;
+        if (isEmpty) return true;
+        
+        // Respond to conversational starters occasionally
+        const conversationalStarters = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'thanks', 'thank you'];
+        const isConversational = conversationalStarters.some(starter => 
+            text.includes(starter) || text.startsWith(starter)
+        );
+        
+        if (isConversational) {
+            return Math.random() > 0.6; // 40% chance for greetings
+        }
+        
+        return false;
+    }
+
+    static async generateResponse(message, channel, workspace, allMessages = []) {
+        if (!openai) {
+            console.log('❌ AI Response blocked: OpenAI client not available');
+            return "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.";
+        }
+
+        console.log('🤖 Generating AI response for:', message.text.substring(0, 50) + '...');
+        
+        try {
+            // Build context from recent messages
+            const recentMessages = allMessages.slice(-10).map(msg => 
+                `${msg.sender}: ${msg.text}`
+            ).join('\n');
+
+            // Determine response type based on message content
+            const messageText = message.text.toLowerCase();
+            
+            if (messageText.includes('help') || messageText.includes('how to')) {
+                return await this.generateHelpResponse(message, channel, workspace);
+            } else if (messageText.includes('sentiment') || messageText.includes('mood')) {
+                return await this.analyzeSentiment(recentMessages);
+            } else if (messageText.includes('summary') || messageText.includes('summarize')) {
+                return await this.summarizeConversation(recentMessages);
+            } else if (messageText.includes('topic') || messageText.includes('suggest')) {
+                return await this.suggestTopics(channel, workspace);
+            } else {
+                return await this.generateContextualResponse(message, recentMessages, channel, workspace);
+            }
+        } catch (error) {
+            console.error('❌ AI Response Error:', error.message);
+            console.error('Full error:', error);
+            
+            // Return a helpful error message based on the error type
+            if (error.code === 'insufficient_quota') {
+                return "I've reached my usage limit for now. Please try again later or check your OpenAI account. 💳";
+            } else if (error.code === 'invalid_api_key') {
+                return "There's an issue with my API key configuration. Please check the OpenAI API key. 🔑";
+            } else if (error.code === 'rate_limit_exceeded') {
+                return "I'm being asked too many questions at once! Please wait a moment and try again. ⏰";
+            } else {
+                return `I'm having trouble thinking right now (${error.message}). Please try again in a moment! 🤔`;
+            }
+        }
+    }
+
+    static async generateHelpResponse(message, channel, workspace) {
+        const helpPrompts = {
+            general: `You are a helpful AI assistant for a Slack-like chat application. Provide helpful guidance about:
+            - Creating workspaces and channels
+            - Sending messages and using reactions
+            - File uploads and sharing
+            - Using @ mentions and replies
+            - Organizing conversations
+            
+            Keep responses friendly, concise, and practical. Use emojis appropriately.`,
+            
+            specific: `The user asked: "${message.text}"
+            Channel: ${channel.name}
+            Workspace: ${workspace.name}
+            
+            Provide specific, actionable help for their question.`
+        };
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: helpPrompts.general },
+                { role: "user", content: helpPrompts.specific }
+            ],
+            max_tokens: 200,
+            temperature: 0.7
+        });
+
+        return response.choices[0].message.content;
+    }
+
+    static async analyzeSentiment(recentMessages) {
+        if (!recentMessages || recentMessages.length === 0) {
+            return "I don't see any recent messages to analyze. The conversation seems quiet! 📊";
+        }
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "system",
+                content: `Analyze the sentiment of this conversation and provide a brief, friendly summary. 
+                Include overall mood, energy level, and any notable patterns. Keep it conversational and add relevant emojis.`
+            }, {
+                role: "user",
+                content: `Recent conversation:\n${recentMessages}`
+            }],
+            max_tokens: 150,
+            temperature: 0.6
+        });
+
+        return `📊 **Conversation Analysis:**\n${response.choices[0].message.content}`;
+    }
+
+    static async summarizeConversation(recentMessages) {
+        if (!recentMessages || recentMessages.length === 0) {
+            return "Nothing to summarize yet! Start a conversation and I'll help you recap it later. 📝";
+        }
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "system", 
+                content: `Summarize this conversation in 2-3 sentences. Focus on key points, decisions, and action items. Be concise but informative.`
+            }, {
+                role: "user",
+                content: `Conversation to summarize:\n${recentMessages}`
+            }],
+            max_tokens: 150,
+            temperature: 0.5
+        });
+
+        return `📝 **Conversation Summary:**\n${response.choices[0].message.content}`;
+    }
+
+    static async suggestTopics(channel, workspace) {
+        const suggestions = [
+            `💡 **Topic Ideas for #${channel.name}:**`,
+            "• Share updates on current projects",
+            "• Discuss upcoming goals and deadlines", 
+            "• Exchange helpful resources and tips",
+            "• Plan team activities or meetings",
+            "• Ask questions and get quick answers",
+            "",
+            "What would you like to talk about? I'm here to help facilitate! 🚀"
+        ];
+
+        return suggestions.join('\n');
+    }
+
+    static async generateContextualResponse(message, recentMessages, channel, workspace) {
+        const systemPrompt = `You are a helpful AI assistant in a Slack-like chat application.
+        
+        Context:
+        - Current channel: #${channel.name}
+        - Workspace: ${workspace.name}
+        - You should be friendly, helpful, and conversational
+        - Keep responses concise (1-3 sentences usually)
+        - Use emojis appropriately but don't overdo it
+        - You can help with platform features, answer questions, or just chat
+        - If you don't know something specific, be honest and suggest alternatives
+        
+        Recent conversation context:
+        ${recentMessages}`;
+
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: message.text }
+            ],
+            max_tokens: 200,
+            temperature: 0.8
+        });
+
+        return response.choices[0].message.content;
+    }
+
+    static async createAIMessage(text, channelId) {
+        return {
+            id: `ai_msg_${Date.now()}`,
+            text: text,
+            sender: AI_ASSISTANT.username,
+            userId: AI_ASSISTANT.userId,
+            avatarColor: AI_ASSISTANT.avatarColor,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            replies: [],
+            reactions: [],
+            isAI: true // Special flag to identify AI messages
+        };
+    }
+}
+
 (async () => {
   const lowdb = await import('lowdb');
   const { Low } = lowdb;
@@ -323,6 +567,112 @@ const updateReactionInMessages = (messages, messageId, userId, emoji) => {
       ch.messages.push(message);
       await db.write();
       io.to(channel).emit('chat message', { workspaceId, channelId: channel, msg: message });
+      
+      // AI Assistant Integration - Check if AI should respond
+      try {
+        // Don't let AI respond to itself
+        if (userId !== AI_ASSISTANT.userId && await AIService.shouldRespond(message, ch, workspace)) {
+          // Add a small delay to make AI responses feel more natural
+          setTimeout(async () => {
+            try {
+              await db.read(); // Refresh data
+              const currentWorkspace = findWorkspaceById(db.data.workspaces, workspaceId);
+              const currentChannel = findChannelById(currentWorkspace, channel);
+              
+              const aiResponseText = await AIService.generateResponse(
+                message, 
+                currentChannel, 
+                currentWorkspace, 
+                currentChannel.messages || []
+              );
+              
+              const aiMessage = await AIService.createAIMessage(aiResponseText, channel);
+              currentChannel.messages.push(aiMessage);
+              await db.write();
+              
+              io.to(channel).emit('chat message', { 
+                workspaceId, 
+                channelId: channel, 
+                msg: aiMessage 
+              });
+            } catch (aiError) {
+              console.error('AI Response Error:', aiError);
+            }
+          }, Math.random() * 2000 + 500); // Random delay between 0.5-2.5 seconds
+        }
+      } catch (error) {
+        console.error('AI Check Error:', error);
+      }
+    });
+
+    // Direct AI Request Handler
+    socket.on('ai request', async ({ workspaceId, channelId, prompt, username, userId }) => {
+      console.log('🎯 Direct AI request received:', { workspaceId, channelId, prompt: prompt.substring(0, 50) + '...', username });
+      
+      try {
+        await db.read();
+        const workspace = findWorkspaceById(db.data.workspaces, workspaceId);
+        if (!workspace) {
+          console.log('❌ Workspace not found:', workspaceId);
+          return;
+        }
+        const channel = findChannelById(workspace, channelId);
+        if (!channel) {
+          console.log('❌ Channel not found:', channelId);
+          return;
+        }
+
+        console.log('📝 Processing AI request in channel:', channel.name);
+
+        // Create a mock user message for context (not stored)
+        const mockMessage = {
+          text: prompt,
+          sender: username,
+          userId: userId
+        };
+
+        // Generate AI response
+        console.log('🤖 Calling AIService.generateResponse...');
+        const aiResponseText = await AIService.generateResponse(
+          mockMessage, 
+          channel, 
+          workspace, 
+          channel.messages || []
+        );
+        
+        console.log('✅ AI response generated:', aiResponseText.substring(0, 100) + '...');
+        
+        const aiMessage = await AIService.createAIMessage(aiResponseText, channelId);
+        channel.messages.push(aiMessage);
+        await db.write();
+        
+        console.log('📤 Sending AI response to channel');
+        io.to(channelId).emit('chat message', { 
+          workspaceId, 
+          channelId, 
+          msg: aiMessage 
+        });
+        
+      } catch (error) {
+        console.error('❌ Direct AI Request Error:', error.message);
+        console.error('Full error details:', error);
+        
+        // Send error message
+        try {
+          const errorMessage = await AIService.createAIMessage(
+            `I'm having trouble processing that request: ${error.message} Please try again! 🤔`, 
+            channelId
+          );
+          
+          io.to(channelId).emit('chat message', { 
+            workspaceId, 
+            channelId, 
+            msg: errorMessage 
+          });
+        } catch (errorMsgError) {
+          console.error('❌ Failed to send error message:', errorMsgError);
+        }
+      }
     });
 
     // Delete message

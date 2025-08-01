@@ -59,6 +59,62 @@
             opacity: 0;
             transition: opacity 0.2s ease;
         }
+        
+        /* AI Message Styling */
+        .ai-message {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            border-left: 4px solid #4f46e5;
+            position: relative;
+        }
+        
+        .ai-message::before {
+            content: '🤖';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            font-size: 12px;
+            background: #4f46e5;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .ai-avatar {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+            border: 2px solid #4f46e5;
+            position: relative;
+        }
+        
+        .ai-avatar::after {
+            content: '⚡';
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            font-size: 10px;
+            background: #10b981;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .ai-typing {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            animation: pulse 2s infinite;
+            border-radius: 20px;
+            padding: 8px 16px;
+            margin: 4px 0;
+        }
+        
+        .ai-features-bar {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            border-top: 1px solid #4b5563;
+        }
     </style>
 </head>
 <body>
@@ -127,6 +183,59 @@
             'Nature': ['🌱', '🌿', '🍀', '🎋', '🍃', '🌾', '🌵', '🌲', '🌳', '🌴', '🪵', '🌸', '🌺', '🌻', '🌷', '🌹', '🥀', '🏵️', '🌼', '🌟', '⭐', '🌙', '☀️', '⛅', '🌤️', '⛈️', '🌧️', '❄️', '☃️', '⛄', '🌊', '💧', '🔥', '💥', '⚡', '🌈', '☔', '💨', '❄️', '⭐', '🌟', '💫', '✨'],
             'Food': ['🍎', '🍌', '🍊', '🍋', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🧄', '🧅', '🍄', '🥔', '🍠', '🥐', '🥖', '🍞', '🥨', '🥯', '🧀', '🥚', '🍳', '🧈', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴'],
             'Activities': ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️', '🤼', '🤸', '⛹️', '🤾', '🏌️', '🏇', '🧘', '🏄', '🏊', '🤽']
+        };
+
+        // AI Features Component
+        const AIFeatures = ({ onAIRequest, currentChannel, isVisible }) => {
+            if (!isVisible) return null;
+            
+            const aiFeatures = [
+                { id: 'help', label: '💡 Get Help', prompt: 'How do I use this chat platform? Can you explain the main features?' },
+                { id: 'sentiment', label: '📊 Analyze Mood', prompt: 'Analyze the sentiment and mood of our recent conversation' },
+                { id: 'summary', label: '📝 Summarize', prompt: 'Please summarize our recent conversation and key points' },
+                { id: 'topics', label: '🚀 Suggest Topics', prompt: 'Suggest some interesting topics we could discuss in this channel' },
+                { id: 'tips', label: '✨ Get Tips', prompt: 'Give me some productivity tips for team communication' }
+            ];
+            
+            return (
+                <div className="ai-features-bar p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-300">🤖 AI Assistant</span>
+                        <span className="text-xs text-gray-400">Click to quick-ask</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {aiFeatures.map(feature => (
+                            <button
+                                key={feature.id}
+                                onClick={() => onAIRequest(feature.prompt)}
+                                className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-full transition-colors"
+                                title={`Quick ask: ${feature.label}`}
+                            >
+                                {feature.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+        
+        // AI Typing Indicator Component
+        const AITypingIndicator = ({ isVisible }) => {
+            if (!isVisible) return null;
+            
+            return (
+                <div className="flex items-start mb-2">
+                    <div className="ai-avatar w-8 h-8 rounded-full mr-3 flex-shrink-0"></div>
+                    <div className="ai-typing text-white text-sm">
+                        <span className="font-semibold">🤖 AI Assistant</span> is thinking
+                        <div className="flex space-x-1 mt-1">
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
         // Custom Emoji Picker Component
@@ -426,12 +535,13 @@
             };
 
             const canModify = message.sender === username;
+            const isAI = message.isAI || message.sender?.includes('🤖') || message.userId === 'ai-assistant-001';
 
             return (
                 <div className={`mb-2 ${level > 0 ? 'ml-6 pl-4 message-thread' : ''}`}>
                     <div className="flex items-start">
                         <div 
-                            className="w-8 h-8 rounded-full mr-3 flex-shrink-0" 
+                            className={`w-8 h-8 rounded-full mr-3 flex-shrink-0 ${isAI ? 'ai-avatar' : ''}`}
                             style={{ backgroundColor: message.avatarColor || '#9CA3AF' }}
                         ></div>
                         <div className="flex-grow">
@@ -484,7 +594,16 @@
                                     </div>
                                 </form>
                             ) : (
-                                <p className="text-white mb-1">{message.text}</p>
+                                <div className={`mb-1 ${isAI ? 'ai-message text-white p-3 rounded-lg' : ''}`}>
+                                    <p className={`${isAI ? 'text-white' : 'text-white'}`}>
+                                        {message.text}
+                                    </p>
+                                    {isAI && (
+                                        <div className="text-xs text-gray-200 mt-2 opacity-75">
+                                            ✨ Generated by AI Assistant
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             {message.fileUrl && (
                                 <div className="mb-1">
@@ -733,6 +852,9 @@
             const [showRenameChannel, setShowRenameChannel] = useState(false);
             const [renameTargetId, setRenameTargetId] = useState(null);
             const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, type: null, targetId: null });
+            const [isAITyping, setIsAITyping] = useState(false);
+            const [showAIFeatures, setShowAIFeatures] = useState(true);
+            
             // Configure your backend URL here
             const BACKEND_URL = window.location.hostname === 'localhost' 
                 ? 'http://localhost:4000'
@@ -795,8 +917,16 @@
                     }
                 });
 
-                socket.on('chat message', ({ workspaceId, channelId, msg }) => 
-                    setWorkspaces(ws => addMessageToWorkspaces(ws, workspaceId, channelId, msg)));
+                socket.on('chat message', ({ workspaceId, channelId, msg }) => {
+                    // Hide AI typing indicator when any message arrives
+                    setIsAITyping(false);
+                    setWorkspaces(ws => addMessageToWorkspaces(ws, workspaceId, channelId, msg));
+                    
+                    // Show notification for AI responses
+                    if (msg.isAI && msg.sender?.includes('🤖')) {
+                        console.log('🤖 AI Assistant responded:', msg.text.substring(0, 50) + '...');
+                    }
+                });
                 
                 socket.on('reply added', ({ workspaceId, channelId, parentId, reply }) => 
                     setWorkspaces(ws => addReplyToWorkspaces(ws, workspaceId, channelId, parentId, reply)));
@@ -994,6 +1124,29 @@
             const handleMainMessageSubmit = (e) => {
                 e.preventDefault();
                 handleSendMessage(messageText, messageFileUrl, messageFileName);
+            };
+            
+            // AI Features Handler - Directly trigger AI response
+            const handleAIRequest = (prompt) => {
+                if (!selectedWorkspaceId || !selectedChannelId) {
+                    alert('Please select a workspace and channel first');
+                    return;
+                }
+                
+                // Set AI typing indicator
+                setIsAITyping(true);
+                
+                // Send direct AI request to server
+                socket.emit('ai request', { 
+                    workspaceId: selectedWorkspaceId, 
+                    channelId: selectedChannelId, 
+                    prompt: prompt,
+                    username: username,
+                    userId: userId 
+                });
+                
+                // Auto-hide typing indicator after 15 seconds (fallback)
+                setTimeout(() => setIsAITyping(false), 15000);
             };
 
             const handleCreateWorkspace = (workspaceName) => {
@@ -1278,9 +1431,27 @@
                     {/* Main Content */}
                     <div className="flex flex-col flex-1">
                         <div className="flex-1 p-6 overflow-y-auto bg-gray-900 text-white">
-                            <h2 className="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">
-                                #{currentChannel?.name || 'channel'}
-                            </h2>
+                            <div className="flex items-center justify-between mb-4 border-b border-gray-700 pb-2">
+                                <h2 className="text-xl font-semibold">
+                                    #{currentChannel?.name || 'channel'}
+                                </h2>
+                                <button
+                                    onClick={() => setShowAIFeatures(!showAIFeatures)}
+                                    className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-full transition-colors"
+                                    title="Toggle AI Features"
+                                >
+                                    🤖 AI {showAIFeatures ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+                            
+                            {/* AI Features Bar */}
+                            <AIFeatures 
+                                onAIRequest={handleAIRequest}
+                                currentChannel={currentChannel}
+                                isVisible={showAIFeatures}
+                            />
+                            
+                            {/* Messages */}
                             {currentMessages.map(msg => (
                                 <Message
                                     key={msg.id}
@@ -1296,6 +1467,9 @@
                                     onEmojiSelect={handleEmojiSelect}
                                 />
                             ))}
+                            
+                            {/* AI Typing Indicator */}
+                            <AITypingIndicator isVisible={isAITyping} />
                         </div>
 
                         {/* Message Input */}
@@ -1304,7 +1478,7 @@
                                 value={messageText}
                                 onChange={(e) => setMessageText(e.target.value)}
                                 onSubmit={handleMainMessageSubmit}
-                                    placeholder={`Message #${currentChannel?.name}`} 
+                                    placeholder={`Message #${currentChannel?.name} | Type @ai to ask AI Assistant`} 
                                 onFileUpload={handleMessageFileUpload}
                                 buttonText="Send"
                                 className="flex items-center"
