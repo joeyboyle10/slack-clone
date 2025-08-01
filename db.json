@@ -53,6 +53,114 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "ai_msg_1754073230048",
+              "text": "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:33 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "ai_msg_1754073877218",
+              "text": "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:44 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "ai_msg_1754073880177",
+              "text": "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:44 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "ai_msg_1754073882073",
+              "text": "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:44 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "ai_msg_1754073884694",
+              "text": "I'm currently unavailable. Please check if the OpenAI API key is configured correctly.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:44 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "ai_msg_1754074578057",
+              "text": "📝 **Conversation Summary:**\nThe conversation involved a polite exchange between two users, joesefmayson and New Test Subject, expressing gratitude towards each other. However, the AI Assistant repeatedly indicated that it was unavailable and prompted the users to check the configuration of the OpenAI API key. The key action item is to verify the API key settings to resolve the assistant's unavailability.",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:56 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "dadeb3bf-53f2-4836-9757-41f137de9873",
+              "text": "@ai what time is it?",
+              "sender": "joesefmayson",
+              "time": "01:56 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [],
+              "reactions": []
+            },
+            {
+              "id": "ai_msg_1754074604737",
+              "text": "I can't check the current time, but you can easily find it on your device or by asking a digital assistant like Siri or Google Assistant! 😊",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:56 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
+            },
+            {
+              "id": "72daa322-b7e9-4bdb-a096-f0aa7545677d",
+              "text": "@ai can u delete those previous responses?",
+              "sender": "joesefmayson",
+              "time": "01:57 PM",
+              "avatarColor": "hsl(343.004433610389, 70%, 50%)",
+              "senderId": "user_1753369908138",
+              "replies": [],
+              "reactions": []
+            },
+            {
+              "id": "ai_msg_1754074632500",
+              "text": "I can't delete messages, but you can always copy and quote them if you want to address them. If you need help with anything else, just let me know! 😊",
+              "sender": "🤖 AI Assistant",
+              "userId": "ai-assistant-001",
+              "avatarColor": "#6366f1",
+              "time": "01:57 PM",
+              "replies": [],
+              "reactions": [],
+              "isAI": true
             }
           ]
         },

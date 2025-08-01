@@ -11,6 +11,7 @@ primary_region = 'dfw'
 [env]
   NODE_ENV = 'production'
   PORT = '3000'
+  # Add your OpenAI API key via: flyctl secrets set OPENAI_API_KEY=your_key_here
 
 [http_service]
   internal_port = 3000
